@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- iOS 전체 화면 웹앱 모드 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="디지털 액자">
+    
+    <!-- Web App Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- iOS 아이콘 -->
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/icon-152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png">
+    
+    <title>디지털 액자</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+        
+        #slideshow {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            background-color: #000;
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-size: cover; /* 전체 화면 채우기 (iOS 9.3.6 완벽 지원) */
+        }
+        
+        .slide.active {
+            opacity: 1;
+            z-index: 2;
+        }
+        
+        .slide.fadeout {
+            opacity: 0;
+            z-index: 1;
+        }
+        
+        /* 옵션: 이미지 비율 유지 모드 (전체 보기) */
+        /* .slide { background-size: contain; } */
+        
+        .slide-cell {
+            display: none; /* 배경 이미지 사용 시 불필요 */
+        }
+        
+        .slide img {
+            display: none; /* 배경 이미지 사용 시 불필요 */
+        }
+        
+        /* 로딩 화면 */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: table;
+            z-index: 9999;
+        }
+        
+        #loading-cell {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: center;
+        }
+        
+        #loading-text {
+            color: #fff;
+            font-size: 18px;
+        }
+        
+        /* 에러 화면 */
+        #error {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: none;
+            z-index: 10000;
+        }
+        
+        #error-cell {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: center;
+        }
+        
+        #error-text {
+            color: #ef4444;
+            font-size: 16px;
+            padding: 20px;
+        }
+        
+        /* 디버그 정보 (선택사항) */
+        #debug {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 8px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            z-index: 1000;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 로딩 화면 -->
+    <div id="loading">
+        <div id="loading-cell">
+            <div id="loading-text">로딩 중...</div>
+        </div>
+    </div>
+    
+    <!-- 에러 화면 -->
+    <div id="error" style="display: table;">
+        <div id="error-cell">
+            <div id="error-text">이미지를 불러올 수 없습니다.<br>잠시 후 다시 시도합니다.</div>
+        </div>
+    </div>
+    
+    <!-- 슬라이드쇼 -->
+    <div id="slideshow"></div>
+    
+    <!-- 디버그 정보 (개발 시에만 사용) -->
+    <div id="debug"></div>
+    
+    <script>
+        /**
+         * 디지털 액자 슬라이드쇼
+         * iOS 9.3.6 (ES5) 완전 호환
+         */
+        (function() {
+            // 설정
+            var API_URL = window.location.origin;
+            var REFRESH_INTERVAL = 10 * 60 * 1000; // 10분마다 갱신
+            var RETRY_DELAY = 5000; // 5초 후 재시도
+            
+            // DOM 요소
+            var slideshow = document.getElementById('slideshow');
+            var loading = document.getElementById('loading');
+            var error = document.getElementById('error');
+            var debug = document.getElementById('debug');
+            
+            // 상태
+            var images = [];
+            var currentIndex = 0;
+            var slideDuration = 10000;
+            var transitionSpeed = 1000;
+            var displayMode = 'cover'; // 표시 모드 (cover 또는 contain)
+            var timer = null;
+            var isPlaying = false;
+            
+            /**
+             * 로그 출력 (디버그용)
+             */
+            function log(message) {
+                console.log('[Slideshow] ' + message);
+                // 개발 시 디버그 정보 표시
+                // debug.style.display = 'block';
+                // debug.innerText = message;
+            }
+            
+            /**
+             * 이미지 목록 가져오기
+             */
+            function fetchImages() {
+                log('Fetching images...');
+                
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', API_URL + '/api/viewer/images', true);
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            if (data.success && data.images && data.images.length > 0) {
+                                images = data.images;
+                                slideDuration = data.settings.slideDuration || 10000;
+                                transitionSpeed = data.settings.transitionSpeed || 1000;
+                                displayMode = data.settings.displayMode || 'cover';
+                                
+                                log('Loaded ' + images.length + ' images (mode: ' + displayMode + ')');
+                                initSlideshow();
+                            } else {
+                                showError('이미지가 없습니다.');
+                            }
+                        } catch (e) {
+                            log('Parse error: ' + e.message);
+                            showError('데이터 파싱 실패');
+                        }
+                    } else {
+                        log('HTTP error: ' + xhr.status);
+                        showError('서버 연결 실패');
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    log('Network error');
+                    showError('네트워크 오류');
+                };
+                
+                xhr.send();
+            }
+            
+            /**
+             * 슬라이드쇼 초기화
+             */
+            function initSlideshow() {
+                // 기존 슬라이드 제거
+                slideshow.innerHTML = '';
+                
+                // 슬라이드 생성 (배경 이미지 방식)
+                for (var i = 0; i < images.length; i++) {
+                    var slide = document.createElement('div');
+                    slide.className = 'slide';
+                    if (i === 0) {
+                        slide.className += ' active';
+                    }
+                    
+                    // 배경 이미지로 설정
+                    slide.style.backgroundImage = 'url(' + images[i].url + ')';
+                    
+                    // 표시 모드 적용 (cover: 전체 화면, contain: 비율 유지)
+                    slide.style.backgroundSize = displayMode;
+                    
+                    // 데이터 속성 저장 (디버깅용)
+                    slide.setAttribute('data-index', i);
+                    slide.setAttribute('data-name', images[i].originalName);
+                    
+                    slideshow.appendChild(slide);
+                }
+                
+                // 로딩 화면 숨기기
+                loading.style.display = 'none';
+                error.style.display = 'none';
+                
+                // 슬라이드쇼 시작
+                startSlideshow();
+                
+                log('Slideshow initialized');
+            }
+            
+            /**
+             * 슬라이드쇼 시작
+             */
+            function startSlideshow() {
+                if (isPlaying) {
+                    return;
+                }
+                
+                if (images.length <= 1) {
+                    log('Only ' + images.length + ' image, no transition');
+                    return;
+                }
+                
+                isPlaying = true;
+                scheduleNext();
+                
+                log('Slideshow started');
+            }
+            
+            /**
+             * 다음 슬라이드 예약
+             */
+            function scheduleNext() {
+                if (timer) {
+                    clearTimeout(timer);
+                }
+                
+                timer = setTimeout(function() {
+                    nextSlide();
+                    scheduleNext();
+                }, slideDuration);
+            }
+            
+            /**
+             * 다음 슬라이드로 전환
+             */
+            function nextSlide() {
+                var slides = slideshow.getElementsByClassName('slide');
+                if (slides.length === 0) {
+                    return;
+                }
+                
+                // 현재 슬라이드 fadeout
+                slides[currentIndex].className = 'slide fadeout';
+                
+                // 다음 인덱스
+                currentIndex = (currentIndex + 1) % images.length;
+                
+                // 다음 슬라이드 active
+                slides[currentIndex].className = 'slide active';
+                
+                log('Slide ' + (currentIndex + 1) + ' / ' + images.length);
+            }
+            
+            /**
+             * 슬라이드쇼 정지
+             */
+            function stopSlideshow() {
+                if (timer) {
+                    clearTimeout(timer);
+                    timer = null;
+                }
+                isPlaying = false;
+                log('Slideshow stopped');
+            }
+            
+            /**
+             * 에러 표시
+             */
+            function showError(message) {
+                loading.style.display = 'none';
+                error.style.display = 'table';
+                document.getElementById('error-text').innerHTML = message + '<br>잠시 후 다시 시도합니다.';
+                
+                // 5초 후 재시도
+                setTimeout(function() {
+                    error.style.display = 'none';
+                    loading.style.display = 'table';
+                    fetchImages();
+                }, RETRY_DELAY);
+            }
+            
+            /**
+             * 주기적으로 이미지 목록 갱신
+             */
+            function startRefreshTimer() {
+                setInterval(function() {
+                    log('Refreshing images...');
+                    stopSlideshow();
+                    fetchImages();
+                }, REFRESH_INTERVAL);
+            }
+            
+            /**
+             * 페이지 가시성 변경 처리
+             */
+            function handleVisibilityChange() {
+                if (document.hidden || document.webkitHidden) {
+                    log('Page hidden');
+                    stopSlideshow();
+                } else {
+                    log('Page visible');
+                    if (images.length > 1) {
+                        startSlideshow();
+                    }
+                }
+            }
+            
+            // 가시성 변경 이벤트 리스너
+            if (typeof document.hidden !== 'undefined') {
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+            } else if (typeof document.webkitHidden !== 'undefined') {
+                document.addEventListener('webkitvisibilitychange', handleVisibilityChange);
+            }
+            
+            // 초기화
+            log('Initializing...');
+            fetchImages();
+            startRefreshTimer();
+            
+        })();
+    </script>
+</body>
+</html>
+

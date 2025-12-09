@@ -1,0 +1,27 @@
+version: '3.8'
+
+# Digital Album - Local Development
+# PostgreSQL only (app runs on host)
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: digital-album-dev-db
+    environment:
+      POSTGRES_USER: mook
+      POSTGRES_PASSWORD: dalbum@10061912
+      POSTGRES_DB: DAlbumDB
+    ports:
+      # Port 4578 for local development
+      - "4578:5432"
+    volumes:
+      - ./local-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mook"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+

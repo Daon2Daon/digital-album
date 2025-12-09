@@ -1,0 +1,12 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.property.name='replaceAll']",
+        "message": "String.prototype.replaceAll은 iOS 12에서 지원되지 않습니다. 정규식을 사용한 replace를 사용하세요. 예: url.replace(/ /g, '%20')"
+      }
+    ]
+  }
+}

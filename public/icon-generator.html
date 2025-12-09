@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>아이콘 생성기</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .preview {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        .icon-preview {
+            text-align: center;
+        }
+        canvas {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        .control-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], input[type="color"], select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .download-section {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .instructions {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ 디지털 액자 아이콘 생성기</h1>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>텍스트</label>
+                <input type="text" id="iconText" value="액자" maxlength="2">
+            </div>
+            
+            <div class="control-group">
+                <label>배경색</label>
+                <input type="color" id="bgColor" value="#000000">
+            </div>
+            
+            <div class="control-group">
+                <label>텍스트 색</label>
+                <input type="color" id="textColor" value="#ffffff">
+            </div>
+            
+            <div class="control-group">
+                <label>스타일</label>
+                <select id="iconStyle">
+                    <option value="text">텍스트</option>
+                    <option value="frame">액자</option>
+                    <option value="photo">사진</option>
+                </select>
+            </div>
+            
+            <button onclick="generateIcons()">아이콘 생성</button>
+        </div>
+        
+        <div class="preview">
+            <div class="icon-preview">
+                <h3>152×152</h3>
+                <canvas id="canvas152" width="152" height="152"></canvas>
+            </div>
+            <div class="icon-preview">
+                <h3>192×192</h3>
+                <canvas id="canvas192" width="192" height="192"></canvas>
+            </div>
+        </div>
+        
+        <div class="download-section">
+            <button onclick="downloadIcon(152)">152×152 다운로드</button>
+            <button onclick="downloadIcon(192)">192×192 다운로드</button>
+        </div>
+        
+        <div class="instructions">
+            <h3>📝 사용 방법</h3>
+            <ol>
+                <li>원하는 텍스트와 색상을 선택하세요</li>
+                <li>"아이콘 생성" 버튼을 클릭하세요</li>
+                <li>각 사이즈별로 다운로드 버튼을 클릭하세요</li>
+                <li>다운로드한 파일 이름을 변경하세요:
+                    <ul>
+                        <li><code>icon-152.png</code></li>
+                        <li><code>icon-192.png</code></li>
+                    </ul>
+                </li>
+                <li>서버의 <code>public</code> 폴더에 업로드하세요</li>
+                <li>iPad Safari에서 "홈 화면에 추가"를 다시 하세요</li>
+            </ol>
+        </div>
+    </div>
+    
+    <script>
+        function drawIcon(canvas, size) {
+            var ctx = canvas.getContext('2d');
+            var text = document.getElementById('iconText').value || '액자';
+            var bgColor = document.getElementById('bgColor').value;
+            var textColor = document.getElementById('textColor').value;
+            var style = document.getElementById('iconStyle').value;
+            
+            // 배경
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, size, size);
+            
+            ctx.fillStyle = textColor;
+            ctx.strokeStyle = textColor;
+            ctx.lineWidth = size / 30;
+            
+            if (style === 'text') {
+                // 텍스트 스타일
+                ctx.font = 'bold ' + (size / 2.5) + 'px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, size / 2, size / 2);
+            } else if (style === 'frame') {
+                // 액자 스타일
+                var margin = size / 5;
+                ctx.strokeRect(margin, margin, size - margin * 2, size - margin * 2);
+                
+                // 내부 작은 사각형
+                var innerMargin = size / 3;
+                ctx.fillRect(innerMargin, innerMargin, size - innerMargin * 2, size - innerMargin * 2);
+            } else if (style === 'photo') {
+                // 사진 아이콘 스타일
+                var margin = size / 6;
+                
+                // 외곽선
+                ctx.strokeRect(margin, margin, size - margin * 2, size - margin * 2);
+                
+                // 산 모양
+                ctx.beginPath();
+                ctx.moveTo(margin, size - margin);
+                ctx.lineTo(size / 3, size / 2);
+                ctx.lineTo(size / 2, size * 0.6);
+                ctx.lineTo(size * 0.7, size * 0.4);
+                ctx.lineTo(size - margin, size - margin);
+                ctx.fill();
+                
+                // 태양
+                ctx.beginPath();
+                ctx.arc(size * 0.7, size * 0.3, size / 12, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        function generateIcons() {
+            var canvas152 = document.getElementById('canvas152');
+            var canvas192 = document.getElementById('canvas192');
+            
+            drawIcon(canvas152, 152);
+            drawIcon(canvas192, 192);
+        }
+        
+        function downloadIcon(size) {
+            var canvas = document.getElementById('canvas' + size);
+            var link = document.createElement('a');
+            link.download = 'icon-' + size + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+        
+        // 초기 생성
+        generateIcons();
+        
+        // 실시간 업데이트
+        document.getElementById('iconText').addEventListener('input', generateIcons);
+        document.getElementById('bgColor').addEventListener('input', generateIcons);
+        document.getElementById('textColor').addEventListener('input', generateIcons);
+        document.getElementById('iconStyle').addEventListener('change', generateIcons);
+    </script>
+</body>
+</html>
+
+
+
+
+
