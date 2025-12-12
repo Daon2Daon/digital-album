@@ -5,7 +5,7 @@
  * - 관리자: 모던 브라우저
  */
 
-// 환경 변수 로드 (prisma.config.ts 사용 시 필요)
+// 환경 변수 로드
 require('dotenv').config({ path: '.env.local' });
 
 const express = require('express');
@@ -14,7 +14,6 @@ const formidable = require('formidable');
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
-const bcrypt = require('bcryptjs');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -58,9 +57,21 @@ app.get('/api/viewer/images', async function(req, res) {
           slideDuration: 10000,
           transitionEffect: 'fade',
           transitionSpeed: 1000,
-          displayMode: 'cover'
+          displayMode: 'cover',
+          randomOrder: false
         }
       });
+    }
+
+    // 랜덤 순서 옵션이 활성화된 경우 배열을 섞음
+    if (settings.randomOrder) {
+      // Fisher-Yates 셔플 알고리즘
+      for (var i = images.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = images[i];
+        images[i] = images[j];
+        images[j] = temp;
+      }
     }
 
     res.json({
@@ -79,7 +90,8 @@ app.get('/api/viewer/images', async function(req, res) {
         slideDuration: settings.slideDuration,
         transitionEffect: settings.transitionEffect,
         transitionSpeed: settings.transitionSpeed,
-        displayMode: settings.displayMode
+        displayMode: settings.displayMode,
+        randomOrder: settings.randomOrder
       }
     });
   } catch (error) {
@@ -265,7 +277,8 @@ app.get('/api/admin/settings', async function(req, res) {
           slideDuration: 10000,
           transitionEffect: 'fade',
           transitionSpeed: 1000,
-          displayMode: 'cover'
+          displayMode: 'cover',
+          randomOrder: false
         }
       });
     }
@@ -297,14 +310,16 @@ app.put('/api/admin/settings', async function(req, res) {
         slideDuration: data.slideDuration || 10000,
         transitionEffect: data.transitionEffect || 'fade',
         transitionSpeed: data.transitionSpeed || 1000,
-        displayMode: data.displayMode || 'cover'
+        displayMode: data.displayMode || 'cover',
+        randomOrder: data.randomOrder !== undefined ? data.randomOrder : false
       },
       create: {
         id: 1,
         slideDuration: data.slideDuration || 10000,
         transitionEffect: data.transitionEffect || 'fade',
         transitionSpeed: data.transitionSpeed || 1000,
-        displayMode: data.displayMode || 'cover'
+        displayMode: data.displayMode || 'cover',
+        randomOrder: data.randomOrder !== undefined ? data.randomOrder : false
       }
     });
 

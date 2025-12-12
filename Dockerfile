@@ -32,9 +32,11 @@ COPY server.js ./
 COPY prisma ./prisma/
 COPY public ./public/
 COPY package*.json ./
+COPY entrypoint.sh ./
 
-# Create uploads directory
+# Create uploads directory and set permissions
 RUN mkdir -p public/uploads && \
+    chmod +x entrypoint.sh && \
     chown -R node:node /app
 
 # Use non-root user
@@ -47,9 +49,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Expose port
 EXPOSE 8754
 
-# Start application with dumb-init
+# Start application with dumb-init and entrypoint script
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "server.js"]
-
-
-
+CMD ["sh", "entrypoint.sh"]

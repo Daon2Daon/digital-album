@@ -100,6 +100,11 @@
             background: #dc2626;
         }
         
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
         /* 이미지 그리드 */
         .image-grid {
             display: grid;
@@ -159,6 +164,17 @@
             border: 1px solid #d1d5db;
             border-radius: 6px;
             font-size: 14px;
+        }
+        
+        .form-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
         }
         
         /* 상태 메시지 */
@@ -263,7 +279,17 @@
                     </p>
                 </div>
                 
-                <button type="submit" class="btn btn-primary">설정 저장</button>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="randomOrder">
+                        <span>이미지 랜덤 순서로 표시</span>
+                    </label>
+                    <p style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                        체크하면 이미지가 랜덤 순서로 표시됩니다. (새로고침 시마다 순서 변경)
+                    </p>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" id="saveButton">설정 저장</button>
             </form>
         </div>
     </div>
@@ -398,6 +424,7 @@
                     document.getElementById('transitionEffect').value = data.settings.transitionEffect;
                     document.getElementById('transitionSpeed').value = data.settings.transitionSpeed / 1000;
                     document.getElementById('displayMode').value = data.settings.displayMode || 'cover';
+                    document.getElementById('randomOrder').checked = data.settings.randomOrder || false;
                 }
             } catch (error) {
                 console.error('Failed to load settings:', error);
@@ -408,11 +435,20 @@
         async function saveSettings(e) {
             e.preventDefault();
             
+            const saveButton = document.getElementById('saveButton');
+            const originalText = saveButton.textContent;
+            
+            // 버튼 상태 변경 (로딩 표시)
+            saveButton.disabled = true;
+            saveButton.textContent = '저장 중...';
+            saveButton.style.opacity = '0.7';
+            
             const settings = {
                 slideDuration: parseInt(document.getElementById('slideDuration').value) * 1000,
                 transitionEffect: document.getElementById('transitionEffect').value,
                 transitionSpeed: parseFloat(document.getElementById('transitionSpeed').value) * 1000,
-                displayMode: document.getElementById('displayMode').value
+                displayMode: document.getElementById('displayMode').value,
+                randomOrder: document.getElementById('randomOrder').checked
             };
             
             try {
@@ -425,12 +461,30 @@
                 const data = await res.json();
                 
                 if (data.success) {
+                    // 성공 시 버튼을 녹색으로 변경
+                    saveButton.style.background = '#10b981';
+                    saveButton.textContent = '✓ 저장 완료!';
                     showMessage('설정이 저장되었습니다.');
+                    
+                    // 2초 후 원래 상태로 복구
+                    setTimeout(() => {
+                        saveButton.disabled = false;
+                        saveButton.textContent = originalText;
+                        saveButton.style.background = '';
+                        saveButton.style.opacity = '';
+                    }, 2000);
                 } else {
+                    // 실패 시
+                    saveButton.disabled = false;
+                    saveButton.textContent = originalText;
+                    saveButton.style.opacity = '';
                     showMessage(`저장 실패: ${data.error}`, 'error');
                 }
             } catch (error) {
                 console.error('Save error:', error);
+                saveButton.disabled = false;
+                saveButton.textContent = originalText;
+                saveButton.style.opacity = '';
                 showMessage('설정 저장 중 오류가 발생했습니다.', 'error');
             }
         }

@@ -51,13 +51,16 @@ services:
       start_period: 40s
     networks:
       - digital-album-network
-    command: sh -c "npx prisma migrate deploy && node server.js"
+    # 마이그레이션은 entrypoint.sh에서 처리됨
 
 # Named volumes for data persistence
+# 볼륨 이름에 타임스탬프를 추가하여 매번 새로 생성
 volumes:
   postgres_data:
+    name: digital-album_postgres_v2
     driver: local
   uploads_data:
+    name: digital-album_uploads_v2
     driver: local
 
 # Network

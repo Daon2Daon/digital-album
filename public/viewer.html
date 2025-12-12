@@ -182,6 +182,7 @@
             var displayMode = 'cover'; // 표시 모드 (cover 또는 contain)
             var timer = null;
             var isPlaying = false;
+            var preloadedImages = {}; // 프리로드된 이미지 캐시
             
             /**
              * 로그 출력 (디버그용)
@@ -236,41 +237,92 @@
             }
             
             /**
+             * 이미지 프리로드
+             */
+            function preloadImages(callback) {
+                log('Preloading images...');
+                var loadedCount = 0;
+                var totalCount = images.length;
+                
+                // 이미지가 없으면 콜백 실행
+                if (totalCount === 0) {
+                    callback();
+                    return;
+                }
+                
+                // 각 이미지를 프리로드
+                for (var i = 0; i < images.length; i++) {
+                    (function(index) {
+                        var img = new Image();
+                        var url = images[index].url;
+                        
+                        img.onload = function() {
+                            preloadedImages[url] = true;
+                            loadedCount++;
+                            log('Loaded ' + loadedCount + '/' + totalCount + ': ' + images[index].originalName);
+                            
+                            // 모든 이미지 로드 완료
+                            if (loadedCount === totalCount) {
+                                log('All images preloaded');
+                                callback();
+                            }
+                        };
+                        
+                        img.onerror = function() {
+                            log('Failed to load: ' + url);
+                            loadedCount++;
+                            
+                            // 실패해도 계속 진행
+                            if (loadedCount === totalCount) {
+                                callback();
+                            }
+                        };
+                        
+                        img.src = url;
+                    })(i);
+                }
+            }
+            
+            /**
              * 슬라이드쇼 초기화
              */
             function initSlideshow() {
                 // 기존 슬라이드 제거
                 slideshow.innerHTML = '';
+                preloadedImages = {};
                 
-                // 슬라이드 생성 (배경 이미지 방식)
-                for (var i = 0; i < images.length; i++) {
-                    var slide = document.createElement('div');
-                    slide.className = 'slide';
-                    if (i === 0) {
-                        slide.className += ' active';
+                // 먼저 모든 이미지를 프리로드
+                preloadImages(function() {
+                    // 프리로드 완료 후 슬라이드 생성
+                    for (var i = 0; i < images.length; i++) {
+                        var slide = document.createElement('div');
+                        slide.className = 'slide';
+                        if (i === 0) {
+                            slide.className += ' active';
+                        }
+                        
+                        // 배경 이미지로 설정 (이미 프리로드됨)
+                        slide.style.backgroundImage = 'url(' + images[i].url + ')';
+                        
+                        // 표시 모드 적용 (cover: 전체 화면, contain: 비율 유지)
+                        slide.style.backgroundSize = displayMode;
+                        
+                        // 데이터 속성 저장 (디버깅용)
+                        slide.setAttribute('data-index', i);
+                        slide.setAttribute('data-name', images[i].originalName);
+                        
+                        slideshow.appendChild(slide);
                     }
                     
-                    // 배경 이미지로 설정
-                    slide.style.backgroundImage = 'url(' + images[i].url + ')';
+                    // 로딩 화면 숨기기
+                    loading.style.display = 'none';
+                    error.style.display = 'none';
                     
-                    // 표시 모드 적용 (cover: 전체 화면, contain: 비율 유지)
-                    slide.style.backgroundSize = displayMode;
+                    // 슬라이드쇼 시작
+                    startSlideshow();
                     
-                    // 데이터 속성 저장 (디버깅용)
-                    slide.setAttribute('data-index', i);
-                    slide.setAttribute('data-name', images[i].originalName);
-                    
-                    slideshow.appendChild(slide);
-                }
-                
-                // 로딩 화면 숨기기
-                loading.style.display = 'none';
-                error.style.display = 'none';
-                
-                // 슬라이드쇼 시작
-                startSlideshow();
-                
-                log('Slideshow initialized');
+                    log('Slideshow initialized');
+                });
             }
             
             /**
@@ -315,14 +367,19 @@
                     return;
                 }
                 
-                // 현재 슬라이드 fadeout
+                // 다음 인덱스 계산
+                var nextIndex = (currentIndex + 1) % images.length;
+                
+                // 현재 슬라이드의 z-index를 낮춤
                 slides[currentIndex].className = 'slide fadeout';
+                slides[currentIndex].style.zIndex = '1';
                 
-                // 다음 인덱스
-                currentIndex = (currentIndex + 1) % images.length;
+                // 다음 슬라이드를 active로 설정 (상위 레이어)
+                slides[nextIndex].className = 'slide active';
+                slides[nextIndex].style.zIndex = '2';
                 
-                // 다음 슬라이드 active
-                slides[currentIndex].className = 'slide active';
+                // 인덱스 업데이트
+                currentIndex = nextIndex;
                 
                 log('Slide ' + (currentIndex + 1) + ' / ' + images.length);
             }

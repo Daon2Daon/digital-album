@@ -80,7 +80,7 @@ docker-compose ps
 docker-compose logs -f
 ```
 
-자세한 내용: **[docs/SYNOLOGY_DEPLOYMENT.md](./docs/SYNOLOGY_DEPLOYMENT.md)**
+자세한 내용: **[docs/SYNOLOGY_DEPLOYMENT_GUIDE.md](./docs/SYNOLOGY_DEPLOYMENT_GUIDE.md)**
 
 ---
 
@@ -102,26 +102,14 @@ http://[SERVER_IP]:8754/
 
 **결과**: 주소창, 탭바, 툴바 모두 사라진 완전한 전체 화면
 
-자세한 내용: **[docs/HIDE_ADDRESS_BAR.md](./docs/HIDE_ADDRESS_BAR.md)**
-
 ---
 
 ## 📚 문서
 
-### 사용자 가이드
-- **[QUICK_START.md](./docs/QUICK_START.md)** - 빠른 시작 및 문제 해결
-- **[HIDE_ADDRESS_BAR.md](./docs/HIDE_ADDRESS_BAR.md)** - 전체 화면 설정 (3단계)
-- **[FULLSCREEN_GUIDE.md](./docs/FULLSCREEN_GUIDE.md)** - 표시 모드 가이드
-- **[FULLSCREEN_SETUP.md](./docs/FULLSCREEN_SETUP.md)** - 상세 전체 화면 가이드
-
-### 개발자 가이드
-- **[VANILLA_SETUP_GUIDE.md](./docs/VANILLA_SETUP_GUIDE.md)** - 전체 설치 가이드
-- **[PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md)** - 프로젝트 구조
-- **[database-setup.md](./docs/database-setup.md)** - 데이터베이스 설정
-- **[fullscreen-mode-guide.md](./docs/fullscreen-mode-guide.md)** - 기술 문서
-
-### 배포 가이드
-- **[SYNOLOGY_DEPLOYMENT.md](./docs/SYNOLOGY_DEPLOYMENT.md)** ⭐️ - Synology NAS 배포
+### 핵심 가이드
+- **[PROJECT_OVERVIEW.md](./docs/PROJECT_OVERVIEW.md)** ⭐️ - 프로젝트 구조 및 개요
+- **[LOCAL_DOCKER_GUIDE.md](./docs/LOCAL_DOCKER_GUIDE.md)** - 로컬 Docker 테스트 방법
+- **[SYNOLOGY_DEPLOYMENT_GUIDE.md](./docs/SYNOLOGY_DEPLOYMENT_GUIDE.md)** - Synology NAS 배포 가이드
 
 ---
 
@@ -321,7 +309,7 @@ docker-compose restart postgres
 3. Safari 캐시 삭제
 4. 페이지 새로고침
 
-더 많은 문제 해결: **[docs/QUICK_START.md](./docs/QUICK_START.md)**
+더 많은 문제 해결: **[docs/LOCAL_DOCKER_GUIDE.md](./docs/LOCAL_DOCKER_GUIDE.md)** 및 **[docs/SYNOLOGY_DEPLOYMENT_GUIDE.md](./docs/SYNOLOGY_DEPLOYMENT_GUIDE.md)**
 
 ---
 

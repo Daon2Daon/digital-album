@@ -34,7 +34,6 @@ docs/
 
 # Database data (managed by volume)
 local-db-data/
-prisma/migrations/
 
 # Docker files
 Dockerfile

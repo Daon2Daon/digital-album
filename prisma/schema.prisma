@@ -36,5 +36,6 @@ model Settings {
   transitionEffect String   @default("fade") // 전환 효과 (fade, none 등)
   transitionSpeed  Int      @default(1000)  // 전환 속도 (ms)
   displayMode      String   @default("cover") // 표시 모드 (cover: 전체 화면, contain: 비율 유지)
+  randomOrder      Boolean  @default(false)  // 랜덤 순서로 이미지 표시
   updatedAt        DateTime @updatedAt
 }
