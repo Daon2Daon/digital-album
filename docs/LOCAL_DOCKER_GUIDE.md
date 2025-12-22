@@ -21,8 +21,8 @@
 
 ## 🚀 방법 1: 로컬 개발 (권장)
 
-이 방법은 **데이터베이스만 Docker로 실행**하고, 애플리케이션은 로컬에서 직접 실행합니다.
-빠른 개발 사이클과 쉬운 디버깅이 가능합니다.
+이 방법은 **로컬에서 직접 실행**합니다.
+SQLite는 별도의 서버가 필요 없으므로 빠른 개발 사이클과 쉬운 디버깅이 가능합니다.
 
 ### 1단계: 프로젝트 클론
 
@@ -47,29 +47,11 @@ cp .env.local.example .env.local
 # Application
 PORT=8754
 
-# Database (로컬 Docker)
-DATABASE_URL="postgresql://mook:dalbum%4010061912@localhost:4578/DAlbumDB?schema=public"
+# Database (SQLite)
+DATABASE_URL="file:./prisma/dev.db"
 ```
 
-> **참고:** `%40`는 URL 인코딩된 `@` 기호입니다.
-
-### 3단계: Docker로 PostgreSQL 시작
-
-```bash
-# PostgreSQL 컨테이너 시작 (백그라운드)
-docker-compose -f docker-compose.dev.yml up -d
-
-# 컨테이너 상태 확인
-docker-compose -f docker-compose.dev.yml ps
-```
-
-**출력 예시:**
-```
-NAME                 SERVICE    STATUS    PORTS
-digital-album-db    postgres   Up        0.0.0.0:4578->5432/tcp
-```
-
-### 4단계: npm 의존성 설치
+### 3단계: npm 의존성 설치
 
 ```bash
 # 의존성 설치
@@ -79,7 +61,7 @@ npm install
 npx prisma generate
 ```
 
-### 5단계: 데이터베이스 마이그레이션
+### 4단계: 데이터베이스 마이그레이션
 
 ```bash
 # 마이그레이션 실행
@@ -89,7 +71,7 @@ npx prisma migrate deploy
 npx prisma db seed
 ```
 
-### 6단계: 서버 시작
+### 5단계: 서버 시작
 
 ```bash
 # 개발 모드 (자동 재시작)

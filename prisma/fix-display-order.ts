@@ -3,9 +3,14 @@
  * 
  * 사용법:
  * npx tsx prisma/fix-display-order.ts
+ * 
+ * 또는:
+ * DATABASE_URL="file:./prisma/dev.db" npx tsx prisma/fix-display-order.ts
  */
 
-import { prisma } from "../src/lib/prisma";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 async function fixDisplayOrder() {
   try {

@@ -1,6 +1,7 @@
 #!/bin/sh
 # Docker 컨테이너 시작 스크립트
 # Digital Album - Synology NAS 배포용
+# Using SQLite database
 
 set -e
 
@@ -8,14 +9,16 @@ echo "=========================================="
 echo "Digital Album - Starting..."
 echo "=========================================="
 
-# 1. 데이터베이스 연결 대기
+# 1. SQLite 데이터베이스 디렉토리 확인 및 생성
 echo ""
-echo "🔍 Waiting for database connection..."
-until npx prisma db push --skip-generate --accept-data-loss 2>&1 | grep -q "Database is now in sync\|already in sync\|Everything is now in sync"; do
-  echo "⏳ Database not ready yet, retrying in 2 seconds..."
-  sleep 2
-done
-echo "✅ Database connection established!"
+echo "🔍 Checking SQLite database directory..."
+DB_DIR="/app/prisma"
+DB_FILE="$DB_DIR/database.db"
+
+if [ ! -d "$DB_DIR" ]; then
+    echo "📁 Creating database directory..."
+    mkdir -p "$DB_DIR"
+fi
 
 # 2. Prisma 마이그레이션 적용
 echo ""
@@ -25,16 +28,9 @@ if npx prisma migrate deploy; then
 else
     echo "⚠️  Migration failed, attempting recovery..."
     
-    # 실패한 마이그레이션 상태 확인 및 복구
+    # 실패한 마이그레이션 상태 확인
     echo "Checking migration status..."
     npx prisma migrate status || true
-    
-    # 마지막 마이그레이션을 이미 적용된 것으로 표시 시도
-    LAST_MIGRATION=$(ls -1 prisma/migrations | tail -n 1)
-    if [ -n "$LAST_MIGRATION" ]; then
-        echo "Attempting to mark $LAST_MIGRATION as applied..."
-        npx prisma migrate resolve --applied "$LAST_MIGRATION" || true
-    fi
     
     # 재시도
     echo "Retrying migration..."
@@ -59,7 +55,12 @@ fi
 # 4. 최종 데이터베이스 상태 확인
 echo ""
 echo "📋 Final database status:"
-npx prisma migrate status || echo "⚠️  Unable to check migration status"
+if [ -f "$DB_FILE" ]; then
+    echo "✅ SQLite database file exists: $DB_FILE"
+    ls -lh "$DB_FILE" || true
+else
+    echo "⚠️  SQLite database file not found (will be created on first use)"
+fi
 
 # 5. 서버 시작
 echo ""
@@ -69,4 +70,8 @@ echo "=========================================="
 echo ""
 
 exec node server.js
+
+
+
+
 

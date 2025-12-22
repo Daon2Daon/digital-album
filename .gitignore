@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-package-lock.json
+# package-lock.json은 버전 관리에 포함되어야 함 (npm ci 필수)
 
 # Environment variables
 .env

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Digital Album - 배포 완전 리셋 스크립트
-# Synology NAS용
+# Synology NAS용 (SQLite 버전)
 
 set -e
 
@@ -9,8 +9,8 @@ echo "Digital Album - 배포 완전 리셋"
 echo "=========================================="
 echo ""
 echo "⚠️  경고: 다음 항목이 삭제됩니다:"
-echo "  - 모든 컨테이너 (app, postgres)"
-echo "  - 모든 데이터베이스 데이터"
+echo "  - 모든 컨테이너 (app)"
+echo "  - 모든 데이터베이스 데이터 (SQLite 파일)"
 echo "  - 모든 업로드된 이미지"
 echo ""
 echo "계속하려면 'YES'를 입력하세요:"
@@ -44,23 +44,18 @@ fi
 # 3. 볼륨 강제 삭제
 echo ""
 echo "3️⃣  볼륨 강제 삭제 중..."
-sudo docker volume rm digital-album_postgres_data -f || true
-sudo docker volume rm digital-album_uploads_data -f || true
+sudo docker volume rm digital-album_uploads_v2 -f || true
+sudo docker volume rm digital-album_db_v2 -f || true
 
-# 4. 네트워크 삭제
+# 4. 고아 컨테이너 정리
 echo ""
-echo "4️⃣  네트워크 삭제 중..."
-sudo docker network rm digital-album-network || true
-
-# 5. 고아 컨테이너 정리
-echo ""
-echo "5️⃣  시스템 정리 중..."
+echo "4️⃣  시스템 정리 중..."
 sudo docker container prune -f
 sudo docker volume prune -f
 
-# 6. 볼륨 삭제 확인
+# 5. 볼륨 삭제 확인
 echo ""
-echo "6️⃣  볼륨 삭제 확인..."
+echo "5️⃣  볼륨 삭제 확인..."
 REMAINING_VOLUMES=$(sudo docker volume ls | grep digital-album || true)
 if [ -n "$REMAINING_VOLUMES" ]; then
     echo "⚠️  아직 남아있는 볼륨:"
@@ -83,4 +78,9 @@ echo "  sudo docker-compose up -d"
 echo ""
 echo "또는 Container Manager GUI에서 프로젝트를 다시 생성하세요."
 echo ""
+
+
+
+
+
 

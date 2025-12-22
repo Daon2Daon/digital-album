@@ -1,27 +1,13 @@
 version: '3.8'
 
 # Digital Album - Local Development
-# PostgreSQL only (app runs on host)
+# SQLite database (no container needed, app runs on host)
+# SQLite file will be created at ./prisma/dev.db
 
+# Note: This file is kept for compatibility but no services are needed
+# The app will use SQLite database file directly from the host filesystem
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: digital-album-dev-db
-    environment:
-      POSTGRES_USER: mook
-      POSTGRES_PASSWORD: dalbum@10061912
-      POSTGRES_DB: DAlbumDB
-    ports:
-      # Port 4578 for local development
-      - "4578:5432"
-    volumes:
-      - ./local-db-data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mook"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # No services needed - SQLite runs in-process with the app
 
 
 

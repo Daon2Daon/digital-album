@@ -34,7 +34,7 @@ iPad mini 1세대 (iOS 9.3.6)를 위한 완벽한 디지털 액자 솔루션
 
 ### 필요 사항
 - Node.js 18+
-- PostgreSQL 15 (Docker로 자동 설치)
+- SQLite (내장, 별도 설치 불필요)
 - iPad mini 1세대 (iOS 9.3.6)
 
 ### 로컬 개발
@@ -51,10 +51,7 @@ cp .env.example .env.local
 # 3. 의존성 설치
 npm install
 
-# 4. 데이터베이스 시작 (Docker)
-docker-compose -f docker-compose.dev.yml up -d
-
-# 5. 데이터베이스 마이그레이션
+# 4. 데이터베이스 마이그레이션 (SQLite는 별도 서버 불필요)
 npx prisma migrate deploy
 npx prisma generate
 
@@ -118,7 +115,7 @@ http://[SERVER_IP]:8754/
 ### Backend
 - **Express.js** - 웹 서버
 - **Prisma** - ORM
-- **PostgreSQL** - 데이터베이스
+- **SQLite** - 데이터베이스 (내장)
 - **Sharp** - 이미지 처리
 - **Formidable** - 파일 업로드
 
@@ -202,18 +199,12 @@ http://localhost:8754/admin 접속
 ### 환경 변수 (.env)
 
 ```bash
-# 데이터베이스
-DB_USER=mook
-DB_PASSWORD=your_password
-DB_NAME=DAlbumDB
-DB_PORT=4578
-
 # 애플리케이션
 APP_PORT=8754
 NODE_ENV=production
 
-# Prisma
-DATABASE_URL="postgresql://mook:password@postgres:5432/DAlbumDB?schema=public"
+# Prisma (SQLite)
+DATABASE_URL="file:./prisma/database.db"
 ```
 
 ### 슬라이드쇼 설정 (관리자 페이지)
@@ -296,11 +287,11 @@ kill -9 <PID>
 
 ### 데이터베이스 연결 실패
 ```bash
-# Docker 컨테이너 확인
-docker-compose ps
+# SQLite 파일 확인
+ls -la prisma/*.db
 
-# 컨테이너 재시작
-docker-compose restart postgres
+# 마이그레이션 재실행
+npx prisma migrate deploy
 ```
 
 ### iPad에서 이미지 안 보임

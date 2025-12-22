@@ -11,7 +11,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Generate Prisma Client
 RUN npx prisma generate
@@ -34,8 +34,8 @@ COPY public ./public/
 COPY package*.json ./
 COPY entrypoint.sh ./
 
-# Create uploads directory and set permissions
-RUN mkdir -p public/uploads && \
+# Create uploads and prisma directories and set permissions
+RUN mkdir -p public/uploads prisma && \
     chmod +x entrypoint.sh && \
     chown -R node:node /app
 

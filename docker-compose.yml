@@ -2,29 +2,9 @@ version: '3.8'
 
 # Digital Album - Docker Compose Configuration
 # For Synology NAS deployment
+# Using SQLite database (no separate database container needed)
 
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: digital-album-db
-    environment:
-      POSTGRES_USER: ${DB_USER:-mook}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-dalbum@10061912}
-      POSTGRES_DB: ${DB_NAME:-DAlbumDB}
-    ports:
-      - "${DB_PORT:-4578}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-mook}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - digital-album-network
-
   # Application Server
   app:
     build:
@@ -34,36 +14,26 @@ services:
     environment:
       NODE_ENV: production
       PORT: 8754
-      DATABASE_URL: postgresql://${DB_USER:-mook}:${DB_PASSWORD:-dalbum@10061912}@postgres:5432/${DB_NAME:-DAlbumDB}?schema=public
+      DATABASE_URL: file:/app/prisma/database.db
     ports:
       - "${APP_PORT:-8754}:8754"
     volumes:
       - uploads_data:/app/public/uploads
-    depends_on:
-      postgres:
-        condition: service_healthy
+      - db_data:/app/prisma
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:8754/api/viewer/images', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    networks:
-      - digital-album-network
+      start_period: 10s
     # 마이그레이션은 entrypoint.sh에서 처리됨
 
 # Named volumes for data persistence
-# 볼륨 이름에 타임스탬프를 추가하여 매번 새로 생성
 volumes:
-  postgres_data:
-    name: digital-album_postgres_v2
-    driver: local
   uploads_data:
     name: digital-album_uploads_v2
     driver: local
-
-# Network
-networks:
-  digital-album-network:
-    driver: bridge
+  db_data:
+    name: digital-album_db_v2
+    driver: local

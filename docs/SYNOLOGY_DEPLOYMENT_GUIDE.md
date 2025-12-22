@@ -64,8 +64,10 @@
 digital-album/
 ├── server.js                    # 메인 서버 파일
 ├── package.json                 # npm 의존성
+├── package-lock.json            # npm lock 파일 (npm ci 필수)
 ├── Dockerfile                   # Docker 이미지 빌드 설정
 ├── docker-compose.yml           # 프로덕션 배포 설정
+├── entrypoint.sh                # 컨테이너 시작 스크립트 (필수!)
 ├── prisma/                      # 전체 폴더
 │   ├── schema.prisma
 │   ├── seed.ts
@@ -91,6 +93,33 @@ digital-album/
 - File Station에서 드래그 앤 드롭
 - 또는 SFTP 클라이언트 사용 (FileZilla, Cyberduck 등)
 
+#### ⚠️ 중요: 배포 전 필수 파일 체크리스트
+
+빌드 에러를 방지하기 위해 다음 파일들이 **반드시** 포함되어 있는지 확인하세요:
+
+```bash
+# SSH로 NAS에 접속 후 확인
+cd /volume1/docker/digital-album
+ls -la
+```
+
+**필수 파일 확인:**
+- ✅ `entrypoint.sh` - **반드시 필요!** (빌드 에러의 주요 원인)
+- ✅ `package-lock.json` - **반드시 필요!** (npm ci 필수)
+- ✅ `server.js`
+- ✅ `package.json`
+- ✅ `Dockerfile`
+- ✅ `docker-compose.yml`
+- ✅ `prisma/` 폴더 전체
+- ✅ `public/` 폴더 전체
+
+**파일이 누락된 경우:**
+로컬에서 누락된 파일을 다시 업로드하세요:
+```bash
+# 로컬에서 (macOS/Linux)
+scp entrypoint.sh package-lock.json mook@[NAS_IP]:/volume1/docker/digital-album/
+```
+
 ---
 
 ## 🔐 3단계: 환경 변수 설정
@@ -106,36 +135,23 @@ File Station에서 `/volume1/docker/digital-album/` 경로에 `.env` 파일을 �
 4. 다음 내용 입력:
 
 ```bash
-# Database
-DB_USER=mook
-DB_PASSWORD=your_secure_password_here    # ⚠️ 반드시 변경!
-DB_NAME=DAlbumDB
-DB_PORT=4578
-
 # Application
 APP_PORT=8754
 NODE_ENV=production
 
-# Prisma
-DATABASE_URL="postgresql://mook:your_secure_password_here@postgres:5432/DAlbumDB?schema=public"
+# Prisma (SQLite)
+DATABASE_URL="file:/app/prisma/database.db"
 ```
 
-> **⚠️ 중요:** `DB_PASSWORD`를 안전한 비밀번호로 변경하세요!
-> - 최소 12자 이상
-> - 대소문자, 숫자, 특수문자 혼합
-> - 예: `MySecure#Pass2024!`
+> **참고:** SQLite는 파일 기반 데이터베이스로 별도의 사용자명/비밀번호가 필요하지 않습니다.
 
 ### 3.2 환경 변수 설명
 
 | 변수 | 기본값 | 설명 |
 |------|--------|------|
-| `DB_USER` | mook | PostgreSQL 사용자명 |
-| `DB_PASSWORD` | (필수 변경) | PostgreSQL 비밀번호 |
-| `DB_NAME` | DAlbumDB | 데이터베이스 이름 |
-| `DB_PORT` | 4578 | 외부 접속 포트 (내부 차단 권장) |
 | `APP_PORT` | 8754 | 웹 애플리케이션 포트 |
 | `NODE_ENV` | production | Node.js 환경 |
-| `DATABASE_URL` | (자동 구성) | Prisma 연결 문자열 |
+| `DATABASE_URL` | (자동 구성) | Prisma SQLite 연결 문자열 |
 
 ---
 
@@ -189,7 +205,38 @@ drwxr-xr-x  3 admin  users   4096 Dec 12 09:00 ..
 ...
 ```
 
-#### 4.4 Docker Compose 실행
+#### 4.4 기존 컨테이너 정리 (필요한 경우)
+
+**기존 컨테이너가 있는 경우 충돌이 발생할 수 있습니다.** 다음 명령어로 정리하세요:
+
+```bash
+# 기존 컨테이너 확인
+sudo docker ps -a | grep digital-album
+
+# 기존 컨테이너 중지 및 삭제
+sudo docker stop digital-album-app 2>/dev/null || true
+sudo docker rm digital-album-app 2>/dev/null || true
+
+# 또는 docker-compose로 정리 (프로젝트 폴더에서)
+cd /volume1/docker/digital-album
+sudo docker-compose down
+```
+
+**컨테이너 이름 충돌 에러가 발생한 경우:**
+```
+Error: Conflict. The container name "/digital-album-app" is already in use
+```
+
+**해결:**
+```bash
+# 기존 컨테이너 강제 삭제
+sudo docker rm -f digital-album-app
+
+# 그 후 다시 빌드
+sudo docker-compose up -d --build
+```
+
+#### 4.5 Docker Compose 실행
 
 ```bash
 # 백그라운드에서 빌드 및 실행
@@ -197,14 +244,14 @@ sudo docker-compose up -d --build
 ```
 
 **빌드 과정 (약 5-10분 소요):**
-1. ✓ PostgreSQL 이미지 다운로드
-2. ✓ Node.js 베이스 이미지 다운로드
-3. ✓ npm 의존성 설치
-4. ✓ Prisma Client 생성
-5. ✓ 애플리케이션 이미지 빌드
-6. ✓ 컨테이너 시작
+1. ✓ Node.js 베이스 이미지 다운로드
+2. ✓ npm 의존성 설치 (`npm ci --omit=dev`)
+3. ✓ Prisma Client 생성
+4. ✓ 애플리케이션 이미지 빌드
+5. ✓ 컨테이너 시작 및 entrypoint.sh 실행
+6. ✓ Prisma 마이그레이션 자동 적용
 
-#### 4.5 상태 확인
+#### 4.6 상태 확인
 
 ```bash
 # 컨테이너 목록
@@ -218,7 +265,7 @@ digital-album-app      app        Up        0.0.0.0:8754->8754/tcp
 digital-album-db       postgres   Up        0.0.0.0:4578->5432/tcp
 ```
 
-#### 4.6 로그 확인
+#### 4.7 로그 확인
 
 ```bash
 # 실시간 로그 (Ctrl+C로 종료)
@@ -612,7 +659,29 @@ sudo docker-compose exec app chown -R node:node /app/public/uploads
 sudo docker-compose restart app
 ```
 
-### 문제 5: 포트 충돌
+### 문제 5: 컨테이너 이름 충돌
+
+**증상:** "The container name '/digital-album-app' is already in use" 에러
+
+**원인:** 기존에 실행 중이거나 중지된 컨테이너가 남아있음
+
+**해결:**
+```bash
+# 기존 컨테이너 확인
+sudo docker ps -a | grep digital-album-app
+
+# 기존 컨테이너 강제 삭제
+sudo docker rm -f digital-album-app
+
+# 또는 docker-compose로 정리
+cd /volume1/docker/digital-album
+sudo docker-compose down
+
+# 재시도
+sudo docker-compose up -d --build
+```
+
+### 문제 6: 포트 충돌
 
 **증상:** "address already in use" 에러
 

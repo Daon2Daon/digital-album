@@ -19,7 +19,7 @@
 - **Node.js 18+** - JavaScript 런타임
 - **Express.js** - 웹 서버 프레임워크
 - **Prisma** - ORM (Object-Relational Mapping)
-- **PostgreSQL 15** - 데이터베이스
+- **SQLite** - 데이터베이스 (내장, 별도 서버 불필요)
 - **Sharp** - 이미지 리사이징 라이브러리
 - **Formidable** - 멀티파트 파일 업로드 처리
 
@@ -41,9 +41,11 @@
 digital-album/
 ├── 📄 server.js                          # Express 서버 (메인 애플리케이션)
 ├── 📦 package.json                       # npm 의존성 및 스크립트 정의
+├── 📦 package-lock.json                  # npm lock 파일 (버전 관리 필수)
 ├── 🐳 Dockerfile                         # Docker 이미지 빌드 설정
 ├── 🐳 docker-compose.yml                 # 프로덕션 배포 설정
 ├── 🐳 docker-compose.dev.yml             # 로컬 개발 환경 설정
+├── 🔧 entrypoint.sh                      # Docker 컨테이너 시작 스크립트
 ├── 🔒 .env.example                       # 환경 변수 템플릿
 ├── 🔒 .env.local.example                 # 로컬 환경 변수 템플릿
 │
@@ -113,25 +115,33 @@ npm run db:reset       # DB 초기화
 - dumb-init으로 시그널 처리 개선
 
 ### docker-compose.yml
-프로덕션 환경의 멀티 컨테이너 구성을 정의합니다.
+프로덕션 환경의 Docker Compose 구성을 정의합니다.
 
 **서비스:**
-- `postgres` - PostgreSQL 15 데이터베이스
-- `app` - Express 애플리케이션 서버
+- `app` - Express 애플리케이션 서버 (SQLite 내장)
 
 **특징:**
+- SQLite 데이터베이스 사용 (별도 DB 컨테이너 불필요)
 - Named volumes로 데이터 영속성 보장
 - Health check로 자동 복구
 - 자동 재시작 (`restart: unless-stopped`)
-- 네트워크 격리
 
 ### docker-compose.dev.yml
 로컬 개발 환경을 위한 간소화된 구성입니다.
 
 **특징:**
-- PostgreSQL만 컨테이너로 실행
+- SQLite 사용 (컨테이너 불필요)
 - 애플리케이션은 로컬에서 직접 실행 (`node server.js`)
 - 빠른 개발 사이클
+
+### entrypoint.sh
+Docker 컨테이너 시작 시 실행되는 스크립트입니다.
+
+**주요 기능:**
+- Prisma 마이그레이션 자동 적용
+- 초기 데이터 시드 (필요시)
+- SQLite 데이터베이스 초기화
+- 서버 시작
 
 ---
 
@@ -179,18 +189,12 @@ model Settings {
 
 ### .env (프로덕션)
 ```bash
-# Database
-DB_USER=mook
-DB_PASSWORD=your_secure_password
-DB_NAME=DAlbumDB
-DB_PORT=4578
-
 # Application
 APP_PORT=8754
 NODE_ENV=production
 
-# Prisma
-DATABASE_URL="postgresql://mook:your_secure_password@postgres:5432/DAlbumDB?schema=public"
+# Prisma (SQLite)
+DATABASE_URL="file:/app/prisma/database.db"
 ```
 
 ### .env.local (로컬 개발)
@@ -198,8 +202,8 @@ DATABASE_URL="postgresql://mook:your_secure_password@postgres:5432/DAlbumDB?sche
 # Application
 PORT=8754
 
-# Prisma (로컬 Docker)
-DATABASE_URL="postgresql://mook:dalbum%4010061912@localhost:4578/DAlbumDB?schema=public"
+# Prisma (SQLite)
+DATABASE_URL="file:./prisma/dev.db"
 ```
 
 ---
@@ -209,12 +213,12 @@ DATABASE_URL="postgresql://mook:dalbum%4010061912@localhost:4578/DAlbumDB?schema
 | 서비스 | 포트 | 용도 | 노출 |
 |--------|------|------|------|
 | **웹 애플리케이션** | 8754 | HTTP 서버 | ✅ 외부 |
-| **PostgreSQL (외부)** | 4578 | DB 접속 | ⚠️ 로컬만 |
-| **PostgreSQL (내부)** | 5432 | 컨테이너 간 통신 | ❌ 내부 |
 
 **접속 URL:**
 - 뷰어: `http://[서버IP]:8754/`
 - 관리자: `http://[서버IP]:8754/admin`
+
+**참고:** SQLite는 파일 기반 데이터베이스로 별도의 포트가 필요하지 않습니다.
 
 ---
 
@@ -230,7 +234,7 @@ Sharp 이미지 리사이징 (1920px)
     ↓ 파일 저장
 public/uploads/[uuid].jpg
     ↓ Prisma ORM
-PostgreSQL (Image 테이블)
+SQLite (Image 테이블)
     ✓ 완료
 ```
 
@@ -240,7 +244,7 @@ iPad Safari (viewer.html)
     ↓ XMLHttpRequest GET /api/viewer/images
 Express Server (server.js)
     ↓ Prisma 쿼리
-PostgreSQL (Image + Settings 테이블)
+SQLite (Image + Settings 테이블)
     ↓ JSON 응답
 viewer.html
     ↓ JavaScript 처리
@@ -254,7 +258,7 @@ PC 브라우저 (admin.html)
     ↓ PUT /api/admin/settings (JSON)
 Express Server (server.js)
     ↓ Prisma 업데이트
-PostgreSQL (Settings 테이블)
+SQLite (Settings 테이블)
     ✓ 저장 완료
     ↓ 
 iPad 자동 갱신 (최대 10분 후)

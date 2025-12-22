@@ -14,6 +14,7 @@ const formidable = require('formidable');
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -169,7 +170,7 @@ app.post('/api/admin/upload', function(req, res) {
       }
 
       // UUID 생성
-      var uuid = require('crypto').randomUUID();
+      var uuid = crypto.randomUUID();
       var filename = uuid + '.jpg';
       var filepath = path.join(uploadDir, filename);
 
