@@ -46,7 +46,7 @@
             width: 100%;
             height: 100%;
             opacity: 0;
-            transition: opacity 1s ease-in-out;
+            /* transition은 JavaScript에서 동적으로 설정됨 */
             background-color: #000;
             background-position: center center;
             background-repeat: no-repeat;
@@ -284,6 +284,16 @@
             }
             
             /**
+             * 슬라이드에 transition 속성 적용
+             * @param {HTMLElement} slide - 적용할 slide 요소
+             */
+            function applyTransitionSpeed(slide) {
+                // transitionSpeed를 밀리초에서 초로 변환하여 CSS transition에 적용
+                var transitionSeconds = (transitionSpeed / 1000).toFixed(3);
+                slide.style.transition = 'opacity ' + transitionSeconds + 's ease-in-out';
+            }
+            
+            /**
              * 슬라이드쇼 초기화
              */
             function initSlideshow() {
@@ -306,6 +316,9 @@
                         
                         // 표시 모드 적용 (cover: 전체 화면, contain: 비율 유지)
                         slide.style.backgroundSize = displayMode;
+                        
+                        // 전환 속도 적용
+                        applyTransitionSpeed(slide);
                         
                         // 데이터 속성 저장 (디버깅용)
                         slide.setAttribute('data-index', i);
@@ -359,6 +372,23 @@
             }
             
             /**
+             * 슬라이드 생성 (프리로드된 이미지 사용)
+             */
+            function createSlide(index) {
+                var slide = document.createElement('div');
+                slide.className = 'slide';
+                slide.style.backgroundImage = 'url(' + images[index].url + ')';
+                slide.style.backgroundSize = displayMode;
+                
+                // 전환 속도 적용
+                applyTransitionSpeed(slide);
+                
+                slide.setAttribute('data-index', index);
+                slide.setAttribute('data-name', images[index].originalName);
+                return slide;
+            }
+            
+            /**
              * 다음 슬라이드로 전환
              */
             function nextSlide() {
@@ -370,16 +400,50 @@
                 // 다음 인덱스 계산
                 var nextIndex = (currentIndex + 1) % images.length;
                 
-                // 현재 슬라이드의 z-index를 낮춤
-                slides[currentIndex].className = 'slide fadeout';
-                slides[currentIndex].style.zIndex = '1';
+                // 현재 슬라이드 참조 저장 (제거용)
+                var currentSlide = slides[currentIndex];
+                
+                // 현재 슬라이드를 fadeout으로 변경
+                currentSlide.className = 'slide fadeout';
+                currentSlide.style.zIndex = '1';
+                
+                // 다음 슬라이드가 DOM에 있는지 확인
+                var nextSlideElement = null;
+                for (var i = 0; i < slides.length; i++) {
+                    var slideIndex = parseInt(slides[i].getAttribute('data-index'), 10);
+                    if (slideIndex === nextIndex) {
+                        nextSlideElement = slides[i];
+                        break;
+                    }
+                }
+                
+                // 다음 슬라이드가 없으면 생성 (프리로드된 이미지 사용)
+                if (!nextSlideElement) {
+                    nextSlideElement = createSlide(nextIndex);
+                    slideshow.appendChild(nextSlideElement);
+                    log('Created slide ' + (nextIndex + 1));
+                }
                 
                 // 다음 슬라이드를 active로 설정 (상위 레이어)
-                slides[nextIndex].className = 'slide active';
-                slides[nextIndex].style.zIndex = '2';
+                nextSlideElement.className = 'slide active';
+                nextSlideElement.style.zIndex = '2';
                 
                 // 인덱스 업데이트
                 currentIndex = nextIndex;
+                
+                // transition 완료 후 fadeout된 슬라이드 제거 (메모리 누수 방지)
+                setTimeout(function() {
+                    // 현재 active 슬라이드가 아니고 fadeout 상태인 경우에만 제거
+                    if (currentSlide && currentSlide.className.indexOf('active') === -1) {
+                        // 배경 이미지 메모리 해제
+                        currentSlide.style.backgroundImage = '';
+                        // DOM에서 제거
+                        if (currentSlide.parentNode) {
+                            currentSlide.parentNode.removeChild(currentSlide);
+                            log('Removed fadeout slide (index: ' + currentSlide.getAttribute('data-index') + ')');
+                        }
+                    }
+                }, transitionSpeed);
                 
                 log('Slide ' + (currentIndex + 1) + ' / ' + images.length);
             }
