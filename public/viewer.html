@@ -532,11 +532,9 @@
              * 현재 재생 중인 파일명 가져오기
              */
             function getCurrentFileName() {
-                var slides = slideshow.getElementsByClassName('slide');
-                for (var i = 0; i < slides.length; i++) {
-                    if (slides[i].className.indexOf('active') !== -1) {
-                        return slides[i].getAttribute('data-name') || '';
-                    }
+                // currentIndex를 직접 사용하여 정확한 파일명 가져오기
+                if (images && images.length > 0 && currentIndex >= 0 && currentIndex < images.length) {
+                    return images[currentIndex].originalName || '';
                 }
                 return '';
             }
