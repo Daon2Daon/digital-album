@@ -134,6 +134,34 @@
             z-index: 1000;
             display: none;
         }
+        
+        /* 파일명 표시 */
+        #filename-display {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 8px;
+            z-index: 2000;
+            display: none;
+            max-width: 90%;
+            text-align: center;
+            word-break: break-word;
+            transition: opacity 0.3s ease-in-out;
+        }
+        
+        #filename-display.show {
+            display: block;
+            opacity: 1;
+        }
+        
+        #filename-display.hide {
+            opacity: 0;
+        }
     </style>
 </head>
 <body>
@@ -156,6 +184,9 @@
     
     <!-- 디버그 정보 (개발 시에만 사용) -->
     <div id="debug"></div>
+    
+    <!-- 파일명 표시 -->
+    <div id="filename-display"></div>
     
     <script>
         /**
@@ -183,6 +214,8 @@
             var timer = null;
             var isPlaying = false;
             var preloadedImages = {}; // 프리로드된 이미지 캐시
+            var showFileName = false; // 파일명 표시 상태
+            var filenameDisplay = document.getElementById('filename-display');
             
             /**
              * 로그 출력 (디버그용)
@@ -431,6 +464,14 @@
                 // 인덱스 업데이트
                 currentIndex = nextIndex;
                 
+                // 파일명이 표시 중이면 업데이트
+                if (showFileName) {
+                    var fileName = getCurrentFileName();
+                    if (fileName) {
+                        filenameDisplay.textContent = fileName;
+                    }
+                }
+                
                 // transition 완료 후 fadeout된 슬라이드 제거 (메모리 누수 방지)
                 setTimeout(function() {
                     // 현재 active 슬라이드가 아니고 fadeout 상태인 경우에만 제거
@@ -488,6 +529,54 @@
             }
             
             /**
+             * 현재 재생 중인 파일명 가져오기
+             */
+            function getCurrentFileName() {
+                var slides = slideshow.getElementsByClassName('slide');
+                for (var i = 0; i < slides.length; i++) {
+                    if (slides[i].className.indexOf('active') !== -1) {
+                        return slides[i].getAttribute('data-name') || '';
+                    }
+                }
+                return '';
+            }
+            
+            /**
+             * 파일명 표시/숨김 토글
+             */
+            function toggleFileName() {
+                showFileName = !showFileName;
+                
+                if (showFileName) {
+                    var fileName = getCurrentFileName();
+                    if (fileName) {
+                        filenameDisplay.textContent = fileName;
+                        filenameDisplay.style.display = 'block';
+                        // display 설정 후 약간의 지연을 두고 opacity를 적용하여 transition 효과
+                        setTimeout(function() {
+                            filenameDisplay.className = 'show';
+                        }, 10);
+                    }
+                } else {
+                    filenameDisplay.className = 'hide';
+                    // transition 완료 후 display: none으로 변경
+                    setTimeout(function() {
+                        if (!showFileName) {
+                            filenameDisplay.style.display = 'none';
+                        }
+                    }, 300);
+                }
+            }
+            
+            /**
+             * 터치/클릭 이벤트 처리
+             */
+            function handleTouch(e) {
+                e.preventDefault();
+                toggleFileName();
+            }
+            
+            /**
              * 페이지 가시성 변경 처리
              */
             function handleVisibilityChange() {
@@ -508,6 +597,10 @@
             } else if (typeof document.webkitHidden !== 'undefined') {
                 document.addEventListener('webkitvisibilitychange', handleVisibilityChange);
             }
+            
+            // 터치/클릭 이벤트 리스너 (파일명 토글)
+            slideshow.addEventListener('touchstart', handleTouch, { passive: false });
+            slideshow.addEventListener('click', handleTouch);
             
             // 초기화
             log('Initializing...');
