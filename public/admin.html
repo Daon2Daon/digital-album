@@ -359,27 +359,47 @@
             });
         }
         
-        // 이미지 업로드
-        async function uploadFile(file) {
+        // 단일 이미지 업로드 (내부용)
+        async function uploadSingleFile(file) {
             const formData = new FormData();
             formData.append('file', file);
-            
+
+            const res = await fetch(`${API_URL}/api/admin/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await res.json();
+            return { file, data };
+        }
+
+        // 다중 이미지 병렬 업로드
+        async function uploadFiles(files) {
+            if (files.length === 0) return;
+
+            uploadLoading.classList.add('active');
+
             try {
-                uploadLoading.classList.add('active');
-                
-                const res = await fetch(`${API_URL}/api/admin/upload`, {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await res.json();
-                
-                if (data.success) {
-                    showMessage(`${file.name} 업로드 성공!`);
-                    loadImages();
+                // 모든 파일을 병렬로 업로드
+                const results = await Promise.all(
+                    files.map(file => uploadSingleFile(file).catch(err => ({ file, error: err })))
+                );
+
+                // 결과 집계
+                const succeeded = results.filter(r => r.data?.success);
+                const failed = results.filter(r => !r.data?.success || r.error);
+
+                // 결과 메시지 표시
+                if (succeeded.length > 0 && failed.length === 0) {
+                    showMessage(`${succeeded.length}개 파일 업로드 성공!`);
+                } else if (succeeded.length > 0 && failed.length > 0) {
+                    showMessage(`${succeeded.length}개 성공, ${failed.length}개 실패`, 'error');
                 } else {
-                    showMessage(`업로드 실패: ${data.error}`, 'error');
+                    showMessage('업로드에 실패했습니다.', 'error');
                 }
+
+                // 이미지 목록 새로고침
+                loadImages();
             } catch (error) {
                 console.error('Upload error:', error);
                 showMessage('업로드 중 오류가 발생했습니다.', 'error');
@@ -494,7 +514,7 @@
         
         fileInput.addEventListener('change', (e) => {
             const files = Array.from(e.target.files);
-            files.forEach(uploadFile);
+            uploadFiles(files);
             e.target.value = '';
         });
         
@@ -511,9 +531,9 @@
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            
+
             const files = Array.from(e.dataTransfer.files);
-            files.forEach(uploadFile);
+            uploadFiles(files);
         });
         
         settingsForm.addEventListener('submit', saveSettings);

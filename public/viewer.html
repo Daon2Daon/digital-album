@@ -210,6 +210,7 @@
             var currentIndex = 0;
             var slideDuration = 10000;
             var transitionSpeed = 1000;
+            var transitionEffect = 'fade'; // 전환 효과 (fade 또는 none)
             var displayMode = 'cover'; // 표시 모드 (cover 또는 contain)
             var timer = null;
             var isPlaying = false;
@@ -244,9 +245,10 @@
                                 images = data.images;
                                 slideDuration = data.settings.slideDuration || 10000;
                                 transitionSpeed = data.settings.transitionSpeed || 1000;
+                                transitionEffect = data.settings.transitionEffect || 'fade';
                                 displayMode = data.settings.displayMode || 'cover';
-                                
-                                log('Loaded ' + images.length + ' images (mode: ' + displayMode + ')');
+
+                                log('Loaded ' + images.length + ' images (mode: ' + displayMode + ', effect: ' + transitionEffect + ')');
                                 initSlideshow();
                             } else {
                                 showError('이미지가 없습니다.');
@@ -321,9 +323,14 @@
              * @param {HTMLElement} slide - 적용할 slide 요소
              */
             function applyTransitionSpeed(slide) {
-                // transitionSpeed를 밀리초에서 초로 변환하여 CSS transition에 적용
-                var transitionSeconds = (transitionSpeed / 1000).toFixed(3);
-                slide.style.transition = 'opacity ' + transitionSeconds + 's ease-in-out';
+                // transitionEffect가 'none'이면 transition 비활성화
+                if (transitionEffect === 'none') {
+                    slide.style.transition = 'none';
+                } else {
+                    // transitionSpeed를 밀리초에서 초로 변환하여 CSS transition에 적용
+                    var transitionSeconds = (transitionSpeed / 1000).toFixed(3);
+                    slide.style.transition = 'opacity ' + transitionSeconds + 's ease-in-out';
+                }
             }
             
             /**
@@ -473,6 +480,8 @@
                 }
                 
                 // transition 완료 후 fadeout된 슬라이드 제거 (메모리 누수 방지)
+                // transitionEffect가 'none'이면 즉시 제거, 그렇지 않으면 transitionSpeed 후 제거
+                var removeDelay = (transitionEffect === 'none') ? 0 : transitionSpeed;
                 setTimeout(function() {
                     // 현재 active 슬라이드가 아니고 fadeout 상태인 경우에만 제거
                     if (currentSlide && currentSlide.className.indexOf('active') === -1) {
@@ -484,7 +493,7 @@
                             log('Removed fadeout slide (index: ' + currentSlide.getAttribute('data-index') + ')');
                         }
                     }
-                }, transitionSpeed);
+                }, removeDelay);
                 
                 log('Slide ' + (currentIndex + 1) + ' / ' + images.length);
             }

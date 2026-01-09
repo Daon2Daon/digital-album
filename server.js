@@ -25,12 +25,61 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
 // CORS 설정 (개발 환경)
-app.use(function(req, res, next) {
+app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   next();
 });
+
+// ==================== 헬퍼 함수 ====================
+
+/**
+ * 에러 응답 헬퍼
+ */
+const sendError = (res, statusCode, message, error = null) => {
+  if (error) {
+    console.error(`[Error] ${message}:`, error);
+  }
+  res.status(statusCode).json({
+    success: false,
+    error: message
+  });
+};
+
+/**
+ * 설정 조회 또는 생성 (싱글톤)
+ */
+const getOrCreateSettings = async () => {
+  let settings = await prisma.settings.findUnique({
+    where: { id: 1 }
+  });
+
+  if (!settings) {
+    settings = await prisma.settings.create({
+      data: {
+        id: 1,
+        slideDuration: 10000,
+        transitionEffect: 'fade',
+        transitionSpeed: 1000,
+        displayMode: 'cover',
+        randomOrder: false
+      }
+    });
+  }
+
+  return settings;
+};
+
+/**
+ * 다음 displayOrder 값 조회
+ */
+const getNextDisplayOrder = async () => {
+  const lastImage = await prisma.image.findFirst({
+    orderBy: { displayOrder: 'desc' }
+  });
+  return (lastImage?.displayOrder ?? -1) + 1;
+};
 
 // ==================== 뷰어 API (iPad mini 1세대용) ====================
 
@@ -38,55 +87,36 @@ app.use(function(req, res, next) {
  * 뷰어용 이미지 목록 및 설정 조회
  * GET /api/viewer/images
  */
-app.get('/api/viewer/images', async function(req, res) {
+app.get('/api/viewer/images', async (req, res) => {
   try {
-    var images = await prisma.image.findMany({
+    let images = await prisma.image.findMany({
       orderBy: [
         { displayOrder: 'asc' },
         { createdAt: 'desc' }
       ]
     });
 
-    var settings = await prisma.settings.findUnique({
-      where: { id: 1 }
-    });
-
-    if (!settings) {
-      settings = await prisma.settings.create({
-        data: {
-          id: 1,
-          slideDuration: 10000,
-          transitionEffect: 'fade',
-          transitionSpeed: 1000,
-          displayMode: 'cover',
-          randomOrder: false
-        }
-      });
-    }
+    const settings = await getOrCreateSettings();
 
     // 랜덤 순서 옵션이 활성화된 경우 배열을 섞음
     if (settings.randomOrder) {
       // Fisher-Yates 셔플 알고리즘
-      for (var i = images.length - 1; i > 0; i--) {
-        var j = Math.floor(Math.random() * (i + 1));
-        var temp = images[i];
-        images[i] = images[j];
-        images[j] = temp;
+      for (let i = images.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [images[i], images[j]] = [images[j], images[i]];
       }
     }
 
     res.json({
       success: true,
-      images: images.map(function(img) {
-        return {
-          id: img.id,
-          originalName: img.originalName,
-          filename: img.filename,
-          url: img.url,
-          width: img.width,
-          height: img.height
-        };
-      }),
+      images: images.map((img) => ({
+        id: img.id,
+        originalName: img.originalName,
+        filename: img.filename,
+        url: img.url,
+        width: img.width,
+        height: img.height
+      })),
       settings: {
         slideDuration: settings.slideDuration,
         transitionEffect: settings.transitionEffect,
@@ -96,11 +126,7 @@ app.get('/api/viewer/images', async function(req, res) {
       }
     });
   } catch (error) {
-    console.error('[Viewer API] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch images'
-    });
+    sendError(res, 500, '이미지 목록을 불러올 수 없습니다', error);
   }
 });
 
@@ -110,9 +136,9 @@ app.get('/api/viewer/images', async function(req, res) {
  * 이미지 목록 조회
  * GET /api/admin/images
  */
-app.get('/api/admin/images', async function(req, res) {
+app.get('/api/admin/images', async (req, res) => {
   try {
-    var images = await prisma.image.findMany({
+    const images = await prisma.image.findMany({
       orderBy: [
         { displayOrder: 'asc' },
         { createdAt: 'desc' }
@@ -121,14 +147,10 @@ app.get('/api/admin/images', async function(req, res) {
 
     res.json({
       success: true,
-      images: images
+      images
     });
   } catch (error) {
-    console.error('[Admin API] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch images'
-    });
+    sendError(res, 500, '이미지 목록을 불러올 수 없습니다', error);
   }
 });
 
@@ -136,43 +158,36 @@ app.get('/api/admin/images', async function(req, res) {
  * 이미지 업로드
  * POST /api/admin/upload
  */
-app.post('/api/admin/upload', function(req, res) {
-  var uploadDir = path.join(__dirname, 'public', 'uploads');
-  
+app.post('/api/admin/upload', (req, res) => {
+  const uploadDir = path.join(__dirname, 'public', 'uploads');
+
   // uploads 폴더가 없으면 생성
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
 
-  var form = new formidable.IncomingForm({
-    uploadDir: uploadDir,
+  const form = new formidable.IncomingForm({
+    uploadDir,
     keepExtensions: false,
-    maxFileSize: 10 * 1024 * 1024, // 10MB
+    maxFileSize: 10 * 1024 * 1024 // 10MB
   });
 
-  form.parse(req, async function(err, fields, files) {
+  form.parse(req, async (err, fields, files) => {
     if (err) {
-      console.error('[Upload] Error:', err);
-      return res.status(500).json({
-        success: false,
-        error: err.message
-      });
+      return sendError(res, 500, '파일 업로드에 실패했습니다', err);
     }
 
     try {
       // formidable v3는 파일을 배열로 반환
-      var file = Array.isArray(files.file) ? files.file[0] : files.file;
+      const file = Array.isArray(files.file) ? files.file[0] : files.file;
       if (!file) {
-        return res.status(400).json({
-          success: false,
-          error: 'No file provided'
-        });
+        return sendError(res, 400, '파일이 제공되지 않았습니다');
       }
 
       // UUID 생성
-      var uuid = crypto.randomUUID();
-      var filename = uuid + '.jpg';
-      var filepath = path.join(uploadDir, filename);
+      const uuid = crypto.randomUUID();
+      const filename = `${uuid}.jpg`;
+      const filepath = path.join(uploadDir, filename);
 
       // 이미지 리사이징 (1920px 제한)
       await sharp(file.filepath)
@@ -187,32 +202,32 @@ app.post('/api/admin/upload', function(req, res) {
       fs.unlinkSync(file.filepath);
 
       // 메타데이터 추출
-      var metadata = await sharp(filepath).metadata();
-      var stats = fs.statSync(filepath);
+      const metadata = await sharp(filepath).metadata();
+      const stats = fs.statSync(filepath);
+
+      // 다음 displayOrder 값 조회
+      const nextOrder = await getNextDisplayOrder();
 
       // DB에 저장
-      var image = await prisma.image.create({
+      const image = await prisma.image.create({
         data: {
           originalName: file.originalFilename || 'unknown.jpg',
-          filename: filename,
-          url: '/uploads/' + filename,
+          filename,
+          url: `/uploads/${filename}`,
           size: stats.size,
           width: metadata.width,
-          height: metadata.height
+          height: metadata.height,
+          displayOrder: nextOrder
         }
       });
 
-      console.log('[Upload] Success:', filename);
+      console.log(`[Upload] Success: ${filename} (order: ${nextOrder})`);
       res.json({
         success: true,
-        image: image
+        image
       });
     } catch (error) {
-      console.error('[Upload] Error:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message
-      });
+      sendError(res, 500, '이미지 처리에 실패했습니다', error);
     }
   });
 });
@@ -221,23 +236,20 @@ app.post('/api/admin/upload', function(req, res) {
  * 이미지 삭제
  * DELETE /api/admin/images/:id
  */
-app.delete('/api/admin/images/:id', async function(req, res) {
+app.delete('/api/admin/images/:id', async (req, res) => {
   try {
-    var imageId = parseInt(req.params.id);
-    
-    var image = await prisma.image.findUnique({
+    const imageId = parseInt(req.params.id);
+
+    const image = await prisma.image.findUnique({
       where: { id: imageId }
     });
 
     if (!image) {
-      return res.status(404).json({
-        success: false,
-        error: 'Image not found'
-      });
+      return sendError(res, 404, '이미지를 찾을 수 없습니다');
     }
 
     // 파일 삭제
-    var filepath = path.join(__dirname, 'public', image.url);
+    const filepath = path.join(__dirname, 'public', image.url);
     if (fs.existsSync(filepath)) {
       fs.unlinkSync(filepath);
     }
@@ -247,17 +259,13 @@ app.delete('/api/admin/images/:id', async function(req, res) {
       where: { id: imageId }
     });
 
-    console.log('[Delete] Success:', image.filename);
+    console.log(`[Delete] Success: ${image.filename}`);
     res.json({
       success: true,
-      message: 'Image deleted'
+      message: '이미지가 삭제되었습니다'
     });
   } catch (error) {
-    console.error('[Delete] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    sendError(res, 500, '이미지 삭제에 실패했습니다', error);
   }
 });
 
@@ -265,35 +273,15 @@ app.delete('/api/admin/images/:id', async function(req, res) {
  * 설정 조회
  * GET /api/admin/settings
  */
-app.get('/api/admin/settings', async function(req, res) {
+app.get('/api/admin/settings', async (req, res) => {
   try {
-    var settings = await prisma.settings.findUnique({
-      where: { id: 1 }
-    });
-
-    if (!settings) {
-      settings = await prisma.settings.create({
-        data: {
-          id: 1,
-          slideDuration: 10000,
-          transitionEffect: 'fade',
-          transitionSpeed: 1000,
-          displayMode: 'cover',
-          randomOrder: false
-        }
-      });
-    }
-
+    const settings = await getOrCreateSettings();
     res.json({
       success: true,
-      settings: settings
+      settings
     });
   } catch (error) {
-    console.error('[Settings] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    sendError(res, 500, '설정을 불러올 수 없습니다', error);
   }
 });
 
@@ -301,18 +289,18 @@ app.get('/api/admin/settings', async function(req, res) {
  * 설정 업데이트
  * PUT /api/admin/settings
  */
-app.put('/api/admin/settings', async function(req, res) {
+app.put('/api/admin/settings', async (req, res) => {
   try {
-    var data = req.body;
-    
-    var settings = await prisma.settings.upsert({
+    const data = req.body;
+
+    const settings = await prisma.settings.upsert({
       where: { id: 1 },
       update: {
         slideDuration: data.slideDuration || 10000,
         transitionEffect: data.transitionEffect || 'fade',
         transitionSpeed: data.transitionSpeed || 1000,
         displayMode: data.displayMode || 'cover',
-        randomOrder: data.randomOrder !== undefined ? data.randomOrder : false
+        randomOrder: data.randomOrder ?? false
       },
       create: {
         id: 1,
@@ -320,52 +308,47 @@ app.put('/api/admin/settings', async function(req, res) {
         transitionEffect: data.transitionEffect || 'fade',
         transitionSpeed: data.transitionSpeed || 1000,
         displayMode: data.displayMode || 'cover',
-        randomOrder: data.randomOrder !== undefined ? data.randomOrder : false
+        randomOrder: data.randomOrder ?? false
       }
     });
 
     res.json({
       success: true,
-      settings: settings
+      settings
     });
   } catch (error) {
-    console.error('[Settings Update] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    sendError(res, 500, '설정 저장에 실패했습니다', error);
   }
 });
 
 // ==================== 정적 페이지 라우트 ====================
 
 // 뷰어 (iPad mini 1세대용)
-app.get('/', function(req, res) {
+app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'viewer.html'));
 });
 
 // 관리자 페이지 (모던 브라우저용)
-app.get('/admin', function(req, res) {
+app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // ==================== 서버 시작 ====================
 
-var PORT = process.env.PORT || 8754;
-app.listen(PORT, '0.0.0.0', function() {
+const PORT = process.env.PORT || 8754;
+app.listen(PORT, '0.0.0.0', () => {
   console.log('===========================================');
-  console.log('Digital Album Server (Vanilla JS)');
+  console.log('Digital Album Server');
   console.log('===========================================');
-  console.log('Server: http://0.0.0.0:' + PORT);
-  console.log('Viewer: http://0.0.0.0:' + PORT + '/');
-  console.log('Admin:  http://0.0.0.0:' + PORT + '/admin');
+  console.log(`Server: http://0.0.0.0:${PORT}`);
+  console.log(`Viewer: http://0.0.0.0:${PORT}/`);
+  console.log(`Admin:  http://0.0.0.0:${PORT}/admin`);
   console.log('===========================================');
 });
 
 // 프로세스 종료 처리
-process.on('SIGINT', async function() {
+process.on('SIGINT', async () => {
   console.log('\nShutting down server...');
   await prisma.$disconnect();
   process.exit(0);
 });
-
