@@ -1,37 +1,38 @@
-# Digital Album - Docker Compose Configuration
-# For Synology NAS deployment
-# Using SQLite database (no separate database container needed)
+version: '3.9'
 
 services:
-  # Application Server
   app:
     image: ghcr.io/daon2daon/digital-album:latest
     container_name: ipad-mini-album
-    # Watchtower 자동 업데이트 활성화
+    # 최신 이미지 강제 확인
+    pull_policy: always
+    
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      
     environment:
       NODE_ENV: production
-      PORT: ${PORT:-20005}
+      # [변경] 내부 포트는 표준 3000으로 고정
+      PORT: 3000
+      # DB 경로는 내부 경로 유지
       DATABASE_URL: file:/app/prisma/database.db
+      
     ports:
-      - "${PORT:-20005}:${PORT:-20005}"
+      # [변경] 외부(변수) : 내부(3000)
+      - "${HOST_PORT:-20005}:3000"
+      
     volumes:
-      - uploads_data:/app/public/uploads
-      - db_data:/app/prisma
+      # [변경] NAS 절대 경로 매핑
+      # 주의: File Station에서 해당 폴더를 미리 만들어야 함
+      - /volume1/docker/digital-album/uploads:/app/public/uploads
+      - /volume1/docker/digital-album/db:/app/prisma
+      
     restart: unless-stopped
+    
     healthcheck:
-      test: ["CMD", "sh", "-c", "node -e \"require('http').get('http://localhost:'+process.env.PORT+'/api/viewer/images', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})\""]
+      # [변경] 포트 3000 고정으로 스크립트 단순화
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/viewer/images', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-
-# Named volumes for data persistence
-volumes:
-  uploads_data:
-    name: digital-album_uploads_v2
-    driver: local
-  db_data:
-    name: digital-album_db_v2
-    driver: local

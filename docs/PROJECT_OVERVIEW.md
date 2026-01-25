@@ -30,8 +30,11 @@
 
 ### DevOps
 - **Docker** - 컨테이너화
-- **Docker Compose** - 멀티 컨테이너 오케스트레이션
-- **Synology NAS Container Manager** - 배포 플랫폼
+- **GitHub Container Registry (GHCR)** - 이미지 저장소
+- **GitHub Actions** - CI/CD 파이프라인
+- **Portainer** - 컨테이너 오케스트레이션 및 관리
+- **Watchtower** - 자동 업데이트 및 배포
+- **Synology NAS** - 배포 플랫폼
 
 ---
 
@@ -43,11 +46,10 @@ digital-album/
 ├── 📦 package.json                       # npm 의존성 및 스크립트 정의
 ├── 📦 package-lock.json                  # npm lock 파일 (버전 관리 필수)
 ├── 🐳 Dockerfile                         # Docker 이미지 빌드 설정
-├── 🐳 docker-compose.yml                 # 프로덕션 배포 설정
-├── 🐳 docker-compose.dev.yml             # 로컬 개발 환경 설정
+├── 🐳 docker-compose.yml                 # Portainer Stack 배포 설정
 ├── 🔧 entrypoint.sh                      # Docker 컨테이너 시작 스크립트
-├── 🔒 .env.example                       # 환경 변수 템플릿
-├── 🔒 .env.local.example                 # 로컬 환경 변수 템플릿
+├── 🔒 .env.example                       # 환경 변수 템플릿 (프로덕션)
+├── 🔒 .env.local.example                 # 환경 변수 템플릿 (로컬 개발)
 │
 ├── 📂 prisma/                           # 데이터베이스 관련
 │   ├── schema.prisma                    # DB 스키마 정의
@@ -64,9 +66,9 @@ digital-album/
 │       └── .gitkeep
 │
 └── 📂 docs/                             # 프로젝트 문서
-    ├── PROJECT_OVERVIEW.md              # 이 문서
-    ├── LOCAL_DOCKER_GUIDE.md            # 로컬 Docker 테스트 가이드
-    └── SYNOLOGY_DEPLOYMENT_GUIDE.md     # Synology NAS 배포 가이드
+    ├── PROJECT_OVERVIEW.md              # 이 문서 (프로젝트 구조)
+    ├── LOCAL_DOCKER_GUIDE.md            # 로컬 개발 가이드
+    └── SYNOLOGY_DEPLOYMENT_GUIDE.md     # Portainer 배포 가이드
 ```
 
 ---
@@ -115,24 +117,19 @@ npm run db:reset       # DB 초기화
 - dumb-init으로 시그널 처리 개선
 
 ### docker-compose.yml
-프로덕션 환경의 Docker Compose 구성을 정의합니다.
+Portainer Stack 배포를 위한 Docker Compose 구성을 정의합니다.
 
 **서비스:**
 - `app` - Express 애플리케이션 서버 (SQLite 내장)
 
 **특징:**
+- GHCR에서 이미지 자동 Pull (`pull_policy: always`)
+- Watchtower 자동 업데이트 지원 (라벨 설정)
 - SQLite 데이터베이스 사용 (별도 DB 컨테이너 불필요)
-- Named volumes로 데이터 영속성 보장
+- NAS 경로 직접 마운트로 데이터 영속성 보장
 - Health check로 자동 복구
 - 자동 재시작 (`restart: unless-stopped`)
 
-### docker-compose.dev.yml
-로컬 개발 환경을 위한 간소화된 구성입니다.
-
-**특징:**
-- SQLite 사용 (컨테이너 불필요)
-- 애플리케이션은 로컬에서 직접 실행 (`node server.js`)
-- 빠른 개발 사이클
 
 ### entrypoint.sh
 Docker 컨테이너 시작 시 실행되는 스크립트입니다.
@@ -362,30 +359,38 @@ iPad 자동 갱신 (최대 10분 후)
 
 ### 로컬 개발
 ```bash
-# 1. PostgreSQL 시작
-docker-compose -f docker-compose.dev.yml up -d
+# 1. 환경 변수 설정
+cp .env.local.example .env.local
 
-# 2. Prisma 마이그레이션
-npx prisma migrate deploy
+# 2. 의존성 설치
+npm install
+
+# 3. Prisma 설정
 npx prisma generate
+npx prisma migrate deploy
 
-# 3. 서버 시작
+# 4. 서버 시작
 npm run dev  # nodemon으로 자동 재시작
 ```
 
-### 프로덕션 배포
+### Portainer 배포
 ```bash
-# 1. 환경 변수 설정
-cp .env.example .env
-# .env 파일 편집
+# 1. 코드 수정 후 커밋
+git add .
+git commit -m "Update: 기능 추가"
+git push origin main
 
-# 2. Docker Compose 빌드 및 실행
-docker-compose up -d
+# 2. GitHub Actions가 자동으로 이미지 빌드 및 GHCR 푸시
 
-# 3. 상태 확인
-docker-compose ps
-docker-compose logs -f
+# 3. Watchtower가 5분 내 새 이미지 감지 및 자동 재배포
+
+# 4. Portainer UI에서 로그 및 상태 확인
 ```
+
+**자동화된 배포 프로세스:**
+- GitHub에 푸시 → GitHub Actions 빌드 → GHCR 푸시 → Watchtower 감지 → 자동 업데이트
+- SSH 접속 불필요
+- 무중단 롤링 업데이트
 
 ---
 
@@ -430,10 +435,11 @@ chmod 755 public/uploads
 - [ ] 오프라인 지원 (Service Worker)
 - [ ] 이미지 일괄 업로드
 
-### 기술 부채
-- 테스트 코드 작성 (Jest, Playwright)
-- CI/CD 파이프라인 구축
-- 성능 모니터링 도구 연동
+### 기술 개선
+- [ ] 테스트 코드 작성 (Jest, Playwright)
+- [x] CI/CD 파이프라인 구축 (GitHub Actions + GHCR)
+- [x] 자동 배포 시스템 (Portainer + Watchtower)
+- [ ] 성능 모니터링 도구 연동
 
 ---
 

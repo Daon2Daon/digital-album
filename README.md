@@ -59,22 +59,23 @@ npx prisma generate
 node server.js
 ```
 
-### Docker 배포 (Synology NAS)
+### Portainer 배포 (Synology NAS)
+
+Portainer + Watchtower를 통한 자동 배포 및 업데이트:
+
+1. **GHCR에서 이미지 자동 Pull**
+2. **Portainer Stack으로 배포**
+3. **Watchtower가 자동 업데이트 감지 및 재배포**
 
 ```bash
-# 1. 프로젝트 폴더로 이동
-cd digital-album
+# 1. NAS에 폴더 생성 (File Station)
+/volume1/docker/digital-album/uploads
+/volume1/docker/digital-album/db
 
-# 2. 환경 변수 설정
-cp .env.example .env
-# .env 파일 편집
-
-# 3. Docker Compose 실행
-docker-compose up -d
-
-# 4. 상태 확인
-docker-compose ps
-docker-compose logs -f
+# 2. Portainer에서 Stack 생성
+- Name: digital-album
+- Repository: 이 저장소
+- Compose path: docker-compose.yml
 ```
 
 자세한 내용: **[docs/SYNOLOGY_DEPLOYMENT_GUIDE.md](./docs/SYNOLOGY_DEPLOYMENT_GUIDE.md)**
@@ -126,7 +127,9 @@ http://[SERVER_IP]:8754/
 
 ### DevOps
 - **Docker** - 컨테이너화
-- **Docker Compose** - 멀티 컨테이너 관리
+- **GitHub Container Registry (GHCR)** - 이미지 저장소
+- **Portainer** - 컨테이너 관리 및 배포
+- **Watchtower** - 자동 업데이트 감지 및 재배포
 - **Synology NAS** - 배포 플랫폼
 
 ---
@@ -138,8 +141,9 @@ digital-album/
 ├── server.js                         # Express 서버 (메인)
 ├── package.json                      # 의존성
 ├── Dockerfile                        # Docker 이미지
-├── docker-compose.yml                # Docker Compose (프로덕션)
-├── .env.example                      # 환경 변수 템플릿
+├── docker-compose.yml                # Portainer Stack 설정
+├── .env.example                      # 환경 변수 템플릿 (프로덕션)
+├── .env.local.example                # 환경 변수 템플릿 (로컬)
 │
 ├── prisma/
 │   ├── schema.prisma                 # 데이터베이스 스키마
@@ -154,9 +158,9 @@ digital-album/
 │   └── uploads/                      # 업로드된 이미지
 │
 └── docs/                             # 문서
-    ├── QUICK_START.md
-    ├── SYNOLOGY_DEPLOYMENT.md        ⭐️
-    └── ...
+    ├── PROJECT_OVERVIEW.md           # 프로젝트 구조 및 개요
+    ├── SYNOLOGY_DEPLOYMENT_GUIDE.md  # Portainer 배포 가이드 ⭐️
+    └── LOCAL_DOCKER_GUIDE.md         # 로컬 개발 가이드
 ```
 
 ---
@@ -241,22 +245,17 @@ npx prisma studio
 npx prisma migrate reset
 ```
 
-### Docker 관리
+### Portainer 관리
 
-```bash
-# 컨테이너 시작
-docker-compose up -d
+**Portainer UI에서:**
+- Stack 시작/중지/재시작
+- 로그 실시간 확인
+- 컨테이너 상태 모니터링
 
-# 컨테이너 중지
-docker-compose down
-
-# 로그 확인
-docker-compose logs -f
-
-# 재빌드
-docker-compose build --no-cache
-docker-compose up -d
-```
+**Watchtower 자동 업데이트:**
+- GitHub에 코드 푸시 시 자동 이미지 빌드
+- Watchtower가 새 이미지 감지 시 자동 배포
+- 무중단 롤링 업데이트
 
 ---
 
